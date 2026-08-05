@@ -1,2 +1,76 @@
+# ==========================
 # macOS
+# ==========================
 .DS_Store
+
+# ==========================
+# Environment Variables
+# ==========================
+.env
+.env.*
+!.env.example
+
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python build files
+build/
+dist/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# ==========================
+# VS Code
+# ==========================
+.vscode/
+
+# ==========================
+# JetBrains
+# ==========================
+.idea/
+
+# ==========================
+# Testing
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==========================
+# Database
+# ==========================
+*.db
+*.sqlite3
+
+# ==========================
+# ML Models
+# (We'll decide later if we want to commit trained models)
+# ==========================
+ml/saved_models/*.pkl
+ml/saved_models/*.joblib
+
+# ==========================
+# Node (Frontend)
+# ==========================
+frontend/node_modules/
+frontend/dist/
+
+# ==========================
+# Misc
+# ==========================
+*.swp
+*.swo
