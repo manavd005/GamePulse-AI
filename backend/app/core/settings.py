@@ -5,6 +5,7 @@ Separates application configuration into logical sub-settings:
 - SecuritySettings (Mandatory SECRET_KEY, algorithm)
 - RiotApiSettings (API key, default region, timeouts, retry policy)
 - DatabaseSettings (PostgreSQL / SQLite connection string & pool config)
+- PipelineSettings (Raw & Processed data paths, dataset export format, batch sizes)
 - AppSettings (Environment mode, debug, logging)
 
 Strictly validates environment variables and raises ConfigError on missing mandatory secrets.
@@ -18,6 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.exceptions import ConfigError
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = BACKEND_DIR.parent
 ENV_FILE = BACKEND_DIR / ".env"
 
 
@@ -30,7 +32,6 @@ class SecuritySettings(BaseSettings):
         extra="ignore",
     )
 
-    # Mandatory SECRET_KEY - No insecure default fallbacks allowed!
     SECRET_KEY: str = Field(..., description="Mandatory application secret key for signing tokens")
     ALGORITHM: str = Field(default="HS256", description="JWT signing algorithm")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Token expiration duration in minutes")
@@ -38,7 +39,6 @@ class SecuritySettings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
-        """Enforces that SECRET_KEY is non-empty and has reasonable length."""
         if not v or not v.strip():
             raise ConfigError("SECRET_KEY environment variable is missing or empty. Insecure defaults are forbidden.")
         if len(v.strip()) < 16:
@@ -64,7 +64,6 @@ class RiotApiSettings(BaseSettings):
     @field_validator("RIOT_API_KEY")
     @classmethod
     def validate_api_key(cls, v: str) -> str:
-        """Enforces that RIOT_API_KEY is non-empty."""
         if not v or not v.strip():
             raise ConfigError("RIOT_API_KEY environment variable is missing or empty.")
         return v.strip()
@@ -87,6 +86,29 @@ class DatabaseSettings(BaseSettings):
     DB_MAX_OVERFLOW: int = Field(default=10, description="SQLAlchemy connection pool max overflow")
 
 
+class PipelineSettings(BaseSettings):
+    """Data Pipeline and Feature Extraction Configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE) if ENV_FILE.exists() else ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    RAW_DATA_DIR: str = Field(
+        default=str(PROJECT_ROOT / "data" / "raw"),
+        description="Directory storing raw JSON payloads",
+    )
+    PROCESSED_DATA_DIR: str = Field(
+        default=str(PROJECT_ROOT / "data" / "processed"),
+        description="Target directory for processed CSV & Parquet datasets",
+    )
+    DEFAULT_DATASET_FORMAT: str = Field(default="parquet", description="Dataset export format (csv, parquet, both)")
+    BATCH_SIZE: int = Field(default=50, description="Pipeline batch processing size")
+    MAX_MATCHES_PER_RUN: int = Field(default=100, description="Maximum matches per pipeline execution run")
+    OVERWRITE_EXISTING: bool = Field(default=True, description="Overwrite existing dataset files")
+
+
 class AppSettings(BaseSettings):
     """General application metadata and environment settings."""
 
@@ -107,7 +129,7 @@ class Settings:
     """
     Composite Settings Container.
 
-    Aggregates SecuritySettings, RiotApiSettings, DatabaseSettings, and AppSettings.
+    Aggregates SecuritySettings, RiotApiSettings, DatabaseSettings, PipelineSettings, and AppSettings.
     """
 
     def __init__(self) -> None:
@@ -115,13 +137,13 @@ class Settings:
             self.security = SecuritySettings()
             self.riot = RiotApiSettings()
             self.db = DatabaseSettings()
+            self.pipeline = PipelineSettings()
             self.app = AppSettings()
         except ConfigError:
             raise
         except Exception as err:
             raise ConfigError(f"Failed to initialize settings configuration: {err}") from err
 
-    # Global convenience properties for backward compatibility
     @property
     def RIOT_API_KEY(self) -> str:
         return self.riot.RIOT_API_KEY
@@ -159,7 +181,6 @@ class Settings:
         return self.db.DATABASE_URL
 
 
-# Singleton global instance
 settings = Settings()
 
 
